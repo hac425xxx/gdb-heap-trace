@@ -6515,11 +6515,15 @@ class GlibcHeapChunksCommand(GenericCommand):
 
     @only_if_gdb_running
     def do_invoke(self, argv):
+        global __gef_free_chunk_list__
+        if len(__gef_free_chunk_list__) == 0:
+            print(Color.colorify("__gef_free_chunk_list__ is null, you should run heap bins first to get free chunk list", "yellow bold"))
 
         if not argv:
             heap_section = HeapBaseFunction.heap_base()
             if not heap_section:
                 err("Heap not initialized")
+                __gef_free_chunk_list__ = []
                 return
         else:
             heap_section = int(argv[0], 0)
@@ -6528,6 +6532,7 @@ class GlibcHeapChunksCommand(GenericCommand):
         arena = get_main_arena()
         if arena is None:
             err("No valid arena")
+            __gef_free_chunk_list__ = []
             return
 
         nb = self.get_setting("peek_nb_byte")
@@ -6559,6 +6564,9 @@ class GlibcHeapChunksCommand(GenericCommand):
                 break
 
             current_chunk = next_chunk
+        
+        __gef_free_chunk_list__ = []
+
         return
 
 @register_command
