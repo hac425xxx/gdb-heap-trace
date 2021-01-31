@@ -90,7 +90,7 @@ def get_backtrace():
 
 # http://sourceware.org/gdb/current/onlinedocs/gdb/Breakpoints-In-Python.html
 class FunctionReturnValueBreakpoint(gdb.Breakpoint):
-    def __init__(self, name, func_name, heap_trace_info):
+    def __init__(self, name, func_name, alloc_size, heap_trace_info):
         super(FunctionReturnValueBreakpoint, self).__init__(
             name, gdb.BP_BREAKPOINT, internal=False, temporary=True)
         # self.func_result_dict = func_result_dict
@@ -98,6 +98,7 @@ class FunctionReturnValueBreakpoint(gdb.Breakpoint):
         self.is_trigger = False
 
         self.heap_trace_info = heap_trace_info
+        self.alloc_size = alloc_size
 
     def stop(self):
         ret = read_register("rax")
@@ -105,6 +106,7 @@ class FunctionReturnValueBreakpoint(gdb.Breakpoint):
 
         self.heap_trace_info[ret] = {}
         self.heap_trace_info[ret]['backtrace'] = gdb.execute("bt", to_string=True)
+        self.heap_trace_info[ret]['size'] = self.alloc_size
 
         get_backtrace()
         print("\n\n")
@@ -161,7 +163,7 @@ class AllocFunction(gdb.Breakpoint):
         caller = current_frame.older().pc()
 
         print("[{}] size: 0x{:x}, caller:0x{:x}\n".format(self.func_name, sz, caller))
-        bp = FunctionReturnValueBreakpoint("*0x{:x}".format(caller), self.func_name, self.heap_trace_info)
+        bp = FunctionReturnValueBreakpoint("*0x{:x}".format(caller), self.func_name, sz,self.heap_trace_info)
         self.return_value_bp_list.append(bp)
 
 
@@ -195,11 +197,14 @@ class DumpTraceLog(gdb.Command):
 
   def invoke(self, arg, from_tty):
     print("*" * 8 + "heap trace log" + "*" * 8)
+    idx = 0
     for k, v in self.heap_trace_info.items():
         print("\n")
-        print("[ 0x{:x} ]".format(k))
+        print("[ chunk #{} address: 0x{:x}, size: 0x{:x} ]".format(idx, k, v['size']))
         print("[ backtrace ]")
         print(v['backtrace'])
+
+        idx += 1
 
 
 
