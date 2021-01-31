@@ -942,7 +942,7 @@ class GlibcChunk:
 
             backtrace = __gef_heap_trace_info__[self.address]['backtrace']
             for l in backtrace.split("\n"):
-                msg += "    {}\n".format(l.strip())
+                msg += "        {}\n".format(l.strip())
 
         return msg
 
