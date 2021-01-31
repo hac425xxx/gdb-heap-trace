@@ -41,6 +41,16 @@ gef-load-heaptrace out.txt
 
 然后使用 `heap chunks` 就可以在打印 `chunk` 时把处于使用状态的 `chunk` 的调用栈打印出来
 
+
+配合 `vscode` 的代码折叠功能使用更好
+
+```
+折叠所有区域的快捷键：ctrl + k  ctrl + 0 (这里是数字键0)
+
+展开所有区域的快捷键：ctrl + j  ctrl + j
+```
+
+
 示例输出
 
 ```
@@ -62,6 +72,7 @@ Chunk(addr=0x55f2b9ecc490, size=0x50, flags=)
     [0x000055f2b9ecc490     70 93 eb b9 f2 55 00 00 00 00 00 00 00 00 00 00    p....U..........]
 Chunk(addr=0x55f2b9ecc4e0, size=0x2da0, flags=PREV_INUSE, FREE_CHUNK)
 ```
+
 
 
 
