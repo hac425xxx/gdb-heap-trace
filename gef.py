@@ -179,6 +179,9 @@ highlight_table = {}
 ANSI_SPLIT_RE = r"(\033\[[\d;]*m)"
 
 
+__gef_free_chunk_list__ = []
+
+
 
 def reset_all_caches():
     """Free all caches. If an object is cached, it will have a callable attribute `cache_clear`
@@ -919,10 +922,21 @@ class GlibcChunk:
         return "|".join(flags)
 
     def __str__(self):
+        global __gef_free_chunk_list__
+
         msg = "{:s}(addr={:#x}, size={:#x}, flags={:s})".format(Color.colorify("Chunk", "yellow bold underline"),
                                                                 int(self.address),
                                                                 self.get_chunk_size(),
                                                                 self.flags_as_string())
+
+        if self.address in __gef_free_chunk_list__:
+            msg = "{:s}(addr={:#x}, size={:#x}, flags={:s}, {:s})".format(Color.colorify("Chunk", "yellow bold underline"),
+                                                                int(self.address),
+                                                                self.get_chunk_size(),
+                                                                self.flags_as_string(),
+                                                                Color.colorify("FREE_CHUNK", "yellow bold"))
+
+
         return msg
 
     def psprint(self):
@@ -6577,6 +6591,8 @@ class GlibcHeapBinsCommand(GenericCommand):
 
     @staticmethod
     def pprint_bin(arena_addr, index, _type=""):
+        global __gef_free_chunk_list__
+
         arena = GlibcArena(arena_addr)
         fw, bk = arena.bin(index)
 
@@ -6594,6 +6610,9 @@ class GlibcHeapBinsCommand(GenericCommand):
         m = []
         while fw != head:
             chunk = GlibcChunk(fw, from_base=True)
+
+            __gef_free_chunk_list__.append(chunk.address)
+
             m.append("{:s}  {:s}".format(RIGHT_ARROW, str(chunk)))
             fw = chunk.fwd
             nb_chunk += 1
@@ -6617,6 +6636,9 @@ class GlibcHeapTcachebinsCommand(GenericCommand):
 
     @only_if_gdb_running
     def do_invoke(self, argv):
+
+        global __gef_free_chunk_list__
+
         # Determine if we are using libc with tcache built in (2.26+)
         if get_libc_version() < (2, 26):
             info("No Tcache in this version of libc")
@@ -6655,6 +6677,8 @@ class GlibcHeapTcachebinsCommand(GenericCommand):
                     if chunk.address in chunks:
                         m.append("{:s} [loop detected]".format(RIGHT_ARROW))
                         break
+                    
+                    __gef_free_chunk_list__.append(chunk.address)
 
                     chunks.add(chunk.address)
 
@@ -6687,6 +6711,8 @@ class GlibcHeapFastbinsYCommand(GenericCommand):
 
     @only_if_gdb_running
     def do_invoke(self, argv):
+        global __gef_free_chunk_list__
+
         def fastbin_index(sz):
             return (sz >> 4) - 2 if SIZE_SZ == 8 else (sz >> 3) - 2
 
@@ -6717,10 +6743,13 @@ class GlibcHeapFastbinsYCommand(GenericCommand):
                         gef_print("{:s} [loop detected]".format(RIGHT_ARROW), end="")
                         break
 
+
                     if fastbin_index(chunk.get_chunk_size()) != i:
                         gef_print("[incorrect fastbin_index] ", end="")
 
                     chunks.add(chunk.address)
+                    __gef_free_chunk_list__.append(chunk.address)
+
 
                     next_chunk = chunk.get_fwd_ptr(True)
                     if next_chunk == 0:
@@ -9877,6 +9906,8 @@ class GefCommand(gdb.Command):
         GefSetCommand()
         GefRunCommand()
 
+        GefConfigFreeList()
+
         # load the saved settings
         gdb.execute("gef restore")
 
@@ -10333,6 +10364,34 @@ class GefRunCommand(gdb.Command):
         argv = args.split()
         gdb.execute("gef set args {:s}".format(" ".join(argv)))
         gdb.execute("run")
+        return
+
+
+
+class GefConfigFreeList(gdb.Command):
+
+    def __init__(self, *args, **kwargs):
+        super(GefConfigFreeList, self).__init__("gef-config-freelist",
+                                            gdb.COMMAND_SUPPORT,
+                                            gdb.COMPLETE_FILENAME,
+                                            False)
+        return
+
+    def invoke(self, args, from_tty):
+        global __gef_free_chunk_list__
+
+        argv = args.split()
+        if len(argv) != 1:
+            return
+        
+
+        if argv[0] == "clean":
+            __gef_free_chunk_list__ = []
+        else:
+            print("__gef_free_chunk_list__")
+            for addr in __gef_free_chunk_list__:
+                print("chunk: 0x{:x}".format(addr))
+
         return
 
 
