@@ -196,16 +196,27 @@ class DumpTraceLog(gdb.Command):
     self.heap_trace_info = heap_trace_info
 
   def invoke(self, arg, from_tty):
-    print("*" * 8 + "heap trace log" + "*" * 8)
-    idx = 0
-    for k, v in self.heap_trace_info.items():
-        print("\n")
-        print("[ chunk #{} address: 0x{:x}, size: 0x{:x} ]".format(idx, k, v['size']))
-        print("[ backtrace ]")
-        print(v['backtrace'])
+    args = arg.split()
+    if len(args) == 0:
+        print("*" * 8 + "heap trace log" + "*" * 8)
+        idx = 0
+        for k, v in self.heap_trace_info.items():
+            print("\n")
+            print("[ chunk #{} address: 0x{:x}, size: 0x{:x} ]".format(idx, k, v['size']))
+            print("[ backtrace ]")
+            print(v['backtrace'])
 
-        idx += 1
+            idx += 1
+        return
 
+    if args[0] == "help":
+        print("dump-trace-log json out.txt")
+        return
+    
+    if args[0] == "json":
+        import json
+        with open(args[1], "w") as fp:
+            fp.write(json.dumps(self.heap_trace_info))
 
 
 
@@ -249,4 +260,9 @@ DumpTraceLog(heap_trace_info)
 gdb.execute("c")
 
 gdb.execute("source /home/hac425/.gdbinit-gef.py")
+
+gdb.execute("dump-trace-log json out.txt")
+gdb.execute("gef-load-heaptrace out.txt")
+
+
 

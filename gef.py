@@ -180,6 +180,7 @@ ANSI_SPLIT_RE = r"(\033\[[\d;]*m)"
 
 
 __gef_free_chunk_list__ = []
+__gef_heap_trace_info__ = {}
 
 
 
@@ -922,7 +923,7 @@ class GlibcChunk:
         return "|".join(flags)
 
     def __str__(self):
-        global __gef_free_chunk_list__
+        global __gef_free_chunk_list__, __gef_heap_trace_info__
 
         msg = "{:s}(addr={:#x}, size={:#x}, flags={:s})".format(Color.colorify("Chunk", "yellow bold underline"),
                                                                 int(self.address),
@@ -935,7 +936,13 @@ class GlibcChunk:
                                                                 self.get_chunk_size(),
                                                                 self.flags_as_string(),
                                                                 Color.colorify("FREE_CHUNK", "yellow bold"))
+        if self.address in __gef_heap_trace_info__:
+            msg += "\n\n"
+            msg += "    [alloc backtrace]\n"
 
+            backtrace = __gef_heap_trace_info__[self.address]['backtrace']
+            for l in backtrace.split("\n"):
+                msg += "    {}\n".format(l.strip())
 
         return msg
 
@@ -9915,6 +9922,7 @@ class GefCommand(gdb.Command):
         GefRunCommand()
 
         GefConfigFreeList()
+        GefLoadHeaptrace()
 
         # load the saved settings
         gdb.execute("gef restore")
@@ -10401,6 +10409,32 @@ class GefConfigFreeList(gdb.Command):
                 print("chunk: 0x{:x}".format(addr))
 
         return
+
+
+class GefLoadHeaptrace(gdb.Command):
+
+    def __init__(self, *args, **kwargs):
+        super(GefLoadHeaptrace, self).__init__("gef-load-heaptrace",
+                                            gdb.COMMAND_SUPPORT,
+                                            gdb.COMPLETE_FILENAME,
+                                            False)
+        return
+
+    def invoke(self, args, from_tty):
+        global __gef_free_chunk_list__, __gef_heap_trace_info__
+
+        argv = args.split()
+        if len(argv) != 1:
+            return
+        
+        import json
+
+        with open(argv[0], "r") as fp:
+            for k, v in json.loads(fp.read()).items():
+                __gef_heap_trace_info__[int(k)] = v
+
+        return
+
 
 
 class GefAlias(gdb.Command):
